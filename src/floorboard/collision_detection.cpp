@@ -1,6 +1,13 @@
 #include "collision_detection.h"
 #include <glm/ext/quaternion_geometric.hpp>
 
+#define INBETWEEN(p, min, max) (max >= p && min <= p)
+inline bool check_point_in_AABB(const glm::vec2 &point,
+                                const glm::vec2 &aabb_min,
+                                const glm::vec2 &aabb_max) {
+    return INBETWEEN(point.x, aabb_min.x, aabb_max.x) && INBETWEEN(point.y, aabb_min.y, aabb_max.y);
+}
+
 // TODO: Just two (the intersection) points are enought for the AABB contancts..?
 inline bool Floorboard::ColDet::collision_AABB_AABB(const sTransform &transform1,
                                                     const sTransform &transform2,
@@ -16,6 +23,7 @@ inline bool Floorboard::ColDet::collision_AABB_AABB(const sTransform &transform1
         return false;
     }
 
+    // Generar contact points
     manifold->normal = glm::normalize(transform1.position - transform2.position);
 
     const glm::vec2 min_1 = transform1.position - half_size_1, min_2 = transform2.position - half_size_2;
@@ -51,7 +59,25 @@ inline bool Floorboard::ColDet::collision_sphere_AABB(const sTransform &transfor
 inline bool Floorboard::ColDet::collision_sphere_sphere(const sTransform &transform1,
                                                         const sTransform &transform2,
                                                         sCollisionManifold *manifold) {
-    return false;
+    glm::vec2 center_to_center = transform1.position - transform2.position;
+    float intercenter_dist = center_to_center.length();
+
+    float radius_1 = glm::max(transform1.scale.x,
+                              transform1.scale.y) / 2.0f;
+    float radius_2 = glm::max(transform2.scale.x,
+                              transform2.scale.y) / 2.0f;
+
+    float difference = intercenter_dist - (radius_1 + radius_2);
+    if (difference > 0.0f) {
+        return false;
+    }
+
+    manifold->normal = center_to_center / intercenter_dist;
+    manifold->contact_points_count++;
+    manifold->contanct_depth[0] = difference;
+    manifold->contact_points[0] = center_to_center + (manifold->normal * difference);
+
+    return true;
 }
 
 // TODO complete cases
@@ -97,3 +123,7 @@ inline bool Floorboard::ColDet::detect_collision(const sTransform &obj1_transfor
 
     return result;
 }
+
+
+#undef COMPARE
+#undef INBETWEEN
